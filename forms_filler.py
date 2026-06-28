@@ -21,21 +21,84 @@ class HydraulicsFormsFiller:
         self.driver = webdriver.Firefox(service=service, options=firefox_options)
         self.wait = WebDriverWait(self.driver, 30)
 
+    def find_start_button(self):
+        """智能查找'立即开始'按钮，不依赖特定标签"""
+        print("正在智能查找'立即开始'按钮...")
+        
+        # 策略1：通过文本直接查找
+        try:
+            elements = self.driver.find_elements(By.XPATH, "//*[contains(., '立即开始')]")
+            for elem in elements:
+                tag = elem.tag_name.lower()
+                if tag in ['button', 'a', 'span', 'div']:
+                    if elem.is_displayed() and elem.is_enabled():
+                        print(f"✅ 找到按钮: <{tag}>")
+                        return elem
+        except:
+            pass
+        
+        # 策略2：通过常见 class 查找
+        try:
+            classes = ['btn', 'button', 'start', 'primary', 'cta']
+            for cls in classes:
+                xpath = f"//*[contains(@class, '{cls}') and contains(., '开始')]"
+                elems = self.driver.find_elements(By.XPATH, xpath)
+                for elem in elems:
+                    if elem.is_displayed() and elem.is_enabled():
+                        print(f"✅ 通过 class '{cls}' 找到按钮")
+                        return elem
+        except:
+            pass
+        
+        # 策略3：通过 role='button' 查找
+        try:
+            elems = self.driver.find_elements(By.XPATH, "//*[@role='button' and contains(., '开始')]")
+            for elem in elems:
+                if elem.is_displayed() and elem.is_enabled():
+                    print("✅ 通过 role='button' 找到按钮")
+                    return elem
+        except:
+            pass
+        
+        # 策略4：扫描所有元素
+        try:
+            all_elems = self.driver.find_elements(By.XPATH, "//*")
+            for elem in all_elems:
+                try:
+                    text = elem.text.strip()
+                    if text == "立即开始" or text == "开始":
+                        if elem.is_displayed() and elem.is_enabled():
+                            print(f"✅ 通过文本扫描找到: <{elem.tag_name}>")
+                            return elem
+                except:
+                    continue
+        except:
+            pass
+        
+        print("❌ 未能找到'立即开始'按钮")
+        return None
+
     def open_and_start(self):
         print("正在打开问卷...")
         self.driver.get(self.form_url)
-        time.sleep(5)
-        print("正在查找'立即开始'按钮...")
-        try:
-            start_btn = self.driver.find_element(By.XPATH, "//div[text()='立即开始']")
+        
+        # 等待页面加载
+        WebDriverWait(self.driver, 15).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        
+        # 智能查找按钮
+        start_btn = self.find_start_button()
+        
+        if start_btn:
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", start_btn)
-            time.sleep(1)
+            time.sleep(0.5)
             self.driver.execute_script("arguments[0].click();", start_btn)
             print("✓ 已进入问卷")
             time.sleep(5)
             return True
-        except Exception as e:
-            print(f"❌ 点击开始按钮失败: {e}")
+        else:
+            print("❌ 无法进入问卷")
             return False
 
     def fill_questions(self):
@@ -170,7 +233,10 @@ class HydraulicsFormsFiller:
 
 
 def main():
+    # ====== 唯一需要修改的地方 ======
     url = "https://forms.office.com/Pages/ResponsePage.aspx?id=v3exzjsBq0mKnEq84yr8HuHJUQiSLitLk4NbBlTNB51UQlpTQUs4RE5XTlZOQTFPSTZJUkk4MjJIMC4u&origin=QRCode"
+    # ================================
+    
     filler = HydraulicsFormsFiller(url)
     try:
         if filler.open_and_start():
