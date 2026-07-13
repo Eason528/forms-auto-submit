@@ -4,6 +4,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.firefox import GeckoDriverManager
 import time
 import random
@@ -13,99 +15,53 @@ class HydraulicsFormsFiller:
     def __init__(self, form_url):
         self.form_url = form_url
         firefox_options = Options()
+        # ====== 无头模式（GitHub Actions 必需） ======
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
         firefox_options.add_argument("--window-size=1920,1080")
+        firefox_options.add_argument("--disable-gpu")
+        firefox_options.add_argument("--disable-blink-features=AutomationControlled")
+        firefox_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        # ==========================================
         service = Service(GeckoDriverManager().install())
         self.driver = webdriver.Firefox(service=service, options=firefox_options)
         self.wait = WebDriverWait(self.driver, 30)
 
-    def find_start_button(self):
-        """智能查找'立即开始'按钮，不依赖特定标签"""
-        print("正在智能查找'立即开始'按钮...")
-        
-        # 策略1：通过文本直接查找
-        try:
-            elements = self.driver.find_elements(By.XPATH, "//*[contains(., '立即开始')]")
-            for elem in elements:
-                tag = elem.tag_name.lower()
-                if tag in ['button', 'a', 'span', 'div']:
-                    if elem.is_displayed() and elem.is_enabled():
-                        print(f"✅ 找到按钮: <{tag}>")
-                        return elem
-        except:
-            pass
-        
-        # 策略2：通过常见 class 查找
-        try:
-            classes = ['btn', 'button', 'start', 'primary', 'cta']
-            for cls in classes:
-                xpath = f"//*[contains(@class, '{cls}') and contains(., '开始')]"
-                elems = self.driver.find_elements(By.XPATH, xpath)
-                for elem in elems:
-                    if elem.is_displayed() and elem.is_enabled():
-                        print(f"✅ 通过 class '{cls}' 找到按钮")
-                        return elem
-        except:
-            pass
-        
-        # 策略3：通过 role='button' 查找
-        try:
-            elems = self.driver.find_elements(By.XPATH, "//*[@role='button' and contains(., '开始')]")
-            for elem in elems:
-                if elem.is_displayed() and elem.is_enabled():
-                    print("✅ 通过 role='button' 找到按钮")
-                    return elem
-        except:
-            pass
-        
-        # 策略4：扫描所有元素
-        try:
-            all_elems = self.driver.find_elements(By.XPATH, "//*")
-            for elem in all_elems:
-                try:
-                    text = elem.text.strip()
-                    if text == "立即开始" or text == "开始":
-                        if elem.is_displayed() and elem.is_enabled():
-                            print(f"✅ 通过文本扫描找到: <{elem.tag_name}>")
-                            return elem
-                except:
-                    continue
-        except:
-            pass
-        
-        print("❌ 未能找到'立即开始'按钮")
-        return None
-
     def open_and_start(self):
+        """打开问卷并点击'立即开始'按钮"""
         print("正在打开问卷...")
         self.driver.get(self.form_url)
-        
-        # 等待页面加载
-        WebDriverWait(self.driver, 15).until(
-            lambda d: d.execute_script("return document.readyState") == "complete"
-        )
-        
-        # 智能查找按钮
-        start_btn = self.find_start_button()
-        
-        if start_btn:
+        time.sleep(8)
+
+        print("正在查找'立即开始'按钮...")
+        try:
+            start_btn = self.driver.find_element(By.XPATH, "//div[text()='立即开始']")
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", start_btn)
-            time.sleep(0.5)
+            time.sleep(1)
             self.driver.execute_script("arguments[0].click();", start_btn)
             print("✓ 已进入问卷")
             time.sleep(5)
             return True
-        else:
-            print("❌ 无法进入问卷")
-            return False
+        except Exception as e:
+            print(f"❌ 点击开始按钮失败: {e}")
+            # 尝试备用方法
+            try:
+                start_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), '开始')]")
+                self.driver.execute_script("arguments[0].click();", start_btn)
+                print("✓ 已进入问卷 (备用方法)")
+                time.sleep(5)
+                return True
+            except:
+                return False
 
     def fill_questions(self):
+        """完整填写问卷"""
         print("开始填写问卷...")
         time.sleep(3)
 
         def click_label(label_text):
+            """通过标签文本点击单选按钮"""
             try:
                 label = self.driver.find_element(By.XPATH, f"//label[normalize-space(.)='{label_text}']")
                 self.driver.execute_script("arguments[0].click();", label)
@@ -115,6 +71,7 @@ class HydraulicsFormsFiller:
                 print(f"✗ 选择 '{label_text}' 失败: {e}")
                 return False
 
+        # ====== 第1题：发现日期 ======
         try:
             date_input = self.driver.find_element(By.ID, "DatePicker0-label")
             today = datetime.now().strftime("%Y/%m/%d")
@@ -124,16 +81,22 @@ class HydraulicsFormsFiller:
         except Exception as e:
             print(f"✗ 第1题失败: {e}")
 
+        # ====== 第2题：发现项 - ABBS ======
         click_label("ABBS")
 
+        # ====== 第3题：发现人（通过 Tab 定位） ======
         try:
-            name_input = self.driver.find_element(By.XPATH, "//input[@class='-_s-250']")
-            name_input.clear()
-            name_input.send_keys("Yi Wang")
+            for _ in range(1):
+                ActionChains(self.driver).send_keys(Keys.TAB).perform()
+                time.sleep(0.3)
+            active = self.driver.switch_to.active_element
+            active.clear()
+            active.send_keys("Yi Wang")
             print("✓ 第3题 (发现人): Yi Wang")
         except Exception as e:
             print(f"✗ 第3题失败: {e}")
 
+        # ====== 第4题：发现工位 ======
         try:
             dropdown = self.driver.find_element(By.XPATH, 
                 "//div[contains(@class, 'dropdown') or contains(@role, 'combobox') or contains(@aria-haspopup, 'listbox')]")
@@ -153,22 +116,21 @@ class HydraulicsFormsFiller:
         except Exception as e:
             print(f"✗ 第4题填写失败: {e}")
 
+        # ====== 第5题：安全状态 - 安全 ======
         click_label("安全")
 
+        # ====== 第6题：问题描述（通过 Tab 定位） ======
         try:
-            desc_inputs = self.driver.find_elements(By.XPATH, "//input[@class='-_s-250']")
-            if len(desc_inputs) >= 2:
-                desc_inputs[1].clear()
-                desc_inputs[1].send_keys("无问题")
-                print("✓ 第6题 (问题描述): 无问题")
-            else:
-                desc_input = self.driver.find_element(By.XPATH, "//label[contains(text(), '问题描述')]/following::input")
-                desc_input.clear()
-                desc_input.send_keys("无问题")
-                print("✓ 第6题 (问题描述): 无问题")
+            for _ in range(1):
+                ActionChains(self.driver).send_keys(Keys.TAB).perform()
+                time.sleep(0.3)
+            active = self.driver.switch_to.active_element
+            active.send_keys("无问题")
+            print("✓ 第6题 (问题描述): 无问题")
         except Exception as e:
             print(f"✗ 第6题失败: {e}")
 
+        # ====== 第7题：是否沟通 - 是 ======
         try:
             inputs = self.driver.find_elements(By.XPATH, "//input[not(ancestor::div[@aria-hidden='true'])]")
             if len(inputs) > 8:
@@ -182,6 +144,7 @@ class HydraulicsFormsFiller:
             except:
                 print(f"✗ 第7题失败: {e}")
 
+        # ====== 第8题：是否卡特员工 - 是 ======
         try:
             inputs = self.driver.find_elements(By.XPATH, "//input[not(ancestor::div[@aria-hidden='true'])]")
             if len(inputs) > 10:
@@ -205,12 +168,15 @@ class HydraulicsFormsFiller:
             except:
                 print(f"✗ 第8题失败: {e}")
 
+        # ====== 第9题：非卡特员工类型 - 不填写 ======
         print("○ 第9题: 不填写")
+
         print("\n" + "="*60)
         print("✅ 所有题目已填写完成！")
         print("="*60 + "\n")
 
     def submit_form(self):
+        """自动提交问卷"""
         try:
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
@@ -233,9 +199,7 @@ class HydraulicsFormsFiller:
 
 
 def main():
-    # ====== 唯一需要修改的地方 ======
     url = "https://forms.office.com/Pages/ResponsePage.aspx?id=v3exzjsBq0mKnEq84yr8HuHJUQiSLitLk4NbBlTNB51UQlpTQUs4RE5XTlZOQTFPSTZJUkk4MjJIMC4u&origin=QRCode"
-    # ================================
     
     filler = HydraulicsFormsFiller(url)
     try:
