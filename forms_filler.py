@@ -31,17 +31,15 @@ class HydraulicsFormsFiller:
             ActionChains(self.driver).send_keys(Keys.TAB).perform()
             time.sleep(0.3)
 
-    def fill_focused_input(self, text):
+    def log_focus(self, step_name=""):
         active = self.driver.switch_to.active_element
-        active.clear()
-        active.send_keys(text)
-
-    def click_focused(self):
-        active = self.driver.switch_to.active_element
-        active.click()
+        tag = active.tag_name
+        text = active.text.strip() if active.text else ""
+        input_type = active.get_attribute("type") if tag == "input" else ""
+        print(f"  [{step_name}] 焦点: tag={tag}, type={input_type}, text='{text[:30]}'")
+        return active
 
     def open_and_start(self):
-        """打开问卷并点击'立即开始'按钮"""
         print("正在打开问卷...")
         self.driver.get(self.form_url)
         
@@ -101,106 +99,102 @@ class HydraulicsFormsFiller:
         print("开始填写问卷...")
         time.sleep(2)
 
-        # 第1题：日期（循环按 Tab 直到找到日期输入框）
+        # 第1题：日期
         for _ in range(10):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
-            tag = active.tag_name
-            input_type = active.get_attribute("type")
-            print(f"  当前焦点: tag={tag}, type={input_type}")
-            
-            if tag == "input" and input_type in ["text", "date", "tel", "email", "number", None]:
+            active = self.log_focus("第1题")
+            if active.tag_name == "input" and active.get_attribute("type") in ["text", "date", None]:
                 today = datetime.now().strftime("%Y/%m/%d")
                 active.clear()
                 active.send_keys(today)
                 print(f"✓ 第1题 (发现日期): {today}")
                 break
         else:
-            print("✗ 第1题失败: 未找到日期输入框")
+            print("✗ 第1题失败")
             return
 
         # 第2题：ABBS
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
+            active = self.log_focus("第2题")
             if active.text and "ABBS" in active.text:
                 active.click()
                 print("✓ 第2题: ABBS")
                 break
         else:
             print("✗ 第2题失败: 未找到 ABBS")
+            # 不 return，继续尝试后续题目
 
         # 第3题：姓名
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
-            tag = active.tag_name
-            if tag == "input":
+            active = self.log_focus("第3题")
+            if active.tag_name == "input":
                 active.clear()
                 active.send_keys("Yi Wang")
                 print("✓ 第3题 (发现人): Yi Wang")
                 break
         else:
-            print("✗ 第3题失败: 未找到姓名输入框")
+            print("✗ 第3题失败")
 
         # 第4题：工位
         self.press_tab(1)
-        active = self.driver.switch_to.active_element
+        active = self.log_focus("第4题-下拉")
         active.click()
         time.sleep(0.5)
         self.press_tab(1)
+        active = self.log_focus("第4题-选项")
         ActionChains(self.driver).send_keys(Keys.ENTER).perform()
         print("✓ 第4题: 选择工位")
 
         # 第5题：安全
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
+            active = self.log_focus("第5题")
             if active.text and "安全" in active.text:
                 active.click()
                 print("✓ 第5题: 安全")
                 break
         else:
-            print("✗ 第5题失败: 未找到'安全'选项")
+            print("✗ 第5题失败")
 
         # 第6题：问题描述
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
-            tag = active.tag_name
-            if tag == "input":
+            active = self.log_focus("第6题")
+            if active.tag_name == "input":
                 active.clear()
                 active.send_keys("无问题")
                 print("✓ 第6题 (问题描述): 无问题")
                 break
         else:
-            print("✗ 第6题失败: 未找到问题描述输入框")
+            print("✗ 第6题失败")
 
         # 第7题：是
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
+            active = self.log_focus("第7题")
             if active.text and "是" in active.text:
                 active.click()
                 print("✓ 第7题: 是")
                 break
         else:
-            print("✗ 第7题失败: 未找到'是'选项")
+            print("✗ 第7题失败")
 
         # 第8题：是
         for _ in range(5):
             self.press_tab(1)
-            active = self.driver.switch_to.active_element
+            active = self.log_focus("第8题")
             if active.text and "是" in active.text:
                 active.click()
                 print("✓ 第8题: 是")
                 break
         else:
-            print("✗ 第8题失败: 未找到'是'选项")
+            print("✗ 第8题失败")
 
         # 提交
         self.press_tab(2)
-        active = self.driver.switch_to.active_element
+        active = self.log_focus("提交")
         if active.tag_name == "button":
             active.click()
             print("✅ 问卷已自动提交！")
@@ -208,7 +202,7 @@ class HydraulicsFormsFiller:
             print(f"⚠️ 当前焦点在 {active.tag_name}，尝试继续按 Tab...")
             for _ in range(5):
                 self.press_tab(1)
-                active = self.driver.switch_to.active_element
+                active = self.log_focus("提交-继续")
                 if active.tag_name == "button":
                     active.click()
                     print("✅ 问卷已自动提交！")
