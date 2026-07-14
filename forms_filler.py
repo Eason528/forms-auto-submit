@@ -105,25 +105,25 @@ class HydraulicsFormsFiller:
             print("✗ 第1题失败")
             return
 
-        # 第2题：ABBS（通过 value 属性匹配）
+        # 第2题：ABBS
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
             value = active.get_attribute("value") if active.tag_name == "input" else ""
             text = active.text.strip() if active.text else ""
             print(f"  [第2题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
-            
             if value == "ABBS" or "ABBS" in text:
                 active.click()
                 print("✓ 第2题: ABBS")
                 break
         else:
-            print("✗ 第2题失败: 未找到 ABBS")
+            print("✗ 第2题失败")
 
         # 第3题：发现人
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
+            print(f"  [第3题] 焦点: tag={active.tag_name}, type={active.get_attribute('type')}")
             if active.tag_name == "input":
                 active.clear()
                 active.send_keys("Yi Wang")
@@ -132,12 +132,15 @@ class HydraulicsFormsFiller:
         else:
             print("✗ 第3题失败")
 
-        # 第4题：工位（下拉选择）
+        # 第4题：工位
         self.press_tab(1)
         active = self.driver.switch_to.active_element
+        print(f"  [第4题-下拉] 焦点: tag={active.tag_name}, text='{active.text[:20] if active.text else ''}'")
         active.click()
         time.sleep(0.5)
         self.press_tab(1)
+        active = self.driver.switch_to.active_element
+        print(f"  [第4题-选项] 焦点: tag={active.tag_name}, text='{active.text[:20] if active.text else ''}'")
         ActionChains(self.driver).send_keys(Keys.ENTER).perform()
         print("✓ 第4题: 选择工位")
 
@@ -145,7 +148,10 @@ class HydraulicsFormsFiller:
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
-            if active.text and "安全" in active.text:
+            text = active.text.strip() if active.text else ""
+            value = active.get_attribute("value") if active.tag_name == "input" else ""
+            print(f"  [第5题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
+            if "安全" in text or value == "安全":
                 active.click()
                 print("✓ 第5题: 安全")
                 break
@@ -156,7 +162,8 @@ class HydraulicsFormsFiller:
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
-            if active.tag_name == "input":
+            print(f"  [第6题] 焦点: tag={active.tag_name}, type={active.get_attribute('type')}")
+            if active.tag_name in ["input", "textarea"]:
                 active.clear()
                 active.send_keys("无问题")
                 print("✓ 第6题 (问题描述): 无问题")
@@ -168,7 +175,10 @@ class HydraulicsFormsFiller:
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
-            if active.text and "是" in active.text:
+            value = active.get_attribute("value") if active.tag_name == "input" else ""
+            text = active.text.strip() if active.text else ""
+            print(f"  [第7题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
+            if "是" in text or value == "是":
                 active.click()
                 print("✓ 第7题: 是")
                 break
@@ -179,7 +189,10 @@ class HydraulicsFormsFiller:
         for _ in range(5):
             self.press_tab(1)
             active = self.driver.switch_to.active_element
-            if active.text and "是" in active.text:
+            value = active.get_attribute("value") if active.tag_name == "input" else ""
+            text = active.text.strip() if active.text else ""
+            print(f"  [第8题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
+            if "是" in text or value == "是":
                 active.click()
                 print("✓ 第8题: 是")
                 break
@@ -187,18 +200,17 @@ class HydraulicsFormsFiller:
             print("✗ 第8题失败")
 
         # 提交
-        self.press_tab(2)
-        active = self.driver.switch_to.active_element
-        if active.tag_name == "button" and ("提交" in active.text or "Submit" in active.text):
-            active.click()
-            print("✅ 问卷已自动提交！")
-        else:
-            try:
-                submit_btn = self.driver.find_element(By.XPATH, "//button[@type='submit']")
-                submit_btn.click()
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            text = active.text.strip() if active.text else ""
+            print(f"  [提交] 焦点: tag={active.tag_name}, text='{text[:30]}'")
+            if active.tag_name == "button" and ("提交" in text or "Submit" in text):
+                active.click()
                 print("✅ 问卷已自动提交！")
-            except:
-                print("✗ 自动提交失败")
+                break
+        else:
+            print("✗ 自动提交失败")
 
         print("\n" + "="*60)
         print("✅ 所有题目已填写完成！")
