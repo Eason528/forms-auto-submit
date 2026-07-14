@@ -14,7 +14,6 @@ class HydraulicsFormsFiller:
     def __init__(self, form_url):
         self.form_url = form_url
         firefox_options = Options()
-        # 无头模式（GitHub Actions 必需）
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
@@ -27,124 +26,193 @@ class HydraulicsFormsFiller:
         self.driver = webdriver.Firefox(service=service, options=firefox_options)
         self.wait = WebDriverWait(self.driver, 30)
 
-    def open_and_start(self):
-        """打开问卷，通过 Tab 键定位并点击'立即开始'按钮"""
-        print("正在打开问卷...")
-        self.driver.get(self.form_url)
-        
-        # 等待页面加载完成
-        self.wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
-        time.sleep(2)
-        print("页面加载完成")
-        
-        # 检查是否已经直接进入问卷
-        try:
-            self.driver.find_element(By.ID, "DatePicker0-label")
-            print("✓ 已直接进入问卷，无需点击开始按钮")
-            return True
-        except:
-            pass
-        
-        print("正在通过 Tab 键定位'立即开始'按钮...")
-        
-        try:
-            # 点击页面主体，确保焦点在页面内
-            body = self.driver.find_element(By.TAG_NAME, "body")
-            body.click()
-            time.sleep(0.5)
-            
-            # 按 2 次 Tab 键，聚焦到"立即开始"按钮
-            for i in range(2):
-                ActionChains(self.driver).send_keys(Keys.TAB).perform()
-                time.sleep(0.3)
-                print(f"  已按 {i+1} 次 Tab")
-            
-            # 获取当前焦点元素并点击
-            active = self.driver.switch_to.active_element
-            print(f"  焦点元素: tag={active.tag_name}, text='{active.text}'")
-            
-            if active.is_enabled() and active.is_displayed():
-                active.click()
-                print("✓ 已点击'立即开始'按钮")
-                time.sleep(3)
-                return True
-            else:
-                print("❌ 当前焦点元素不可点击")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Tab 键定位失败: {e}")
-            return False
-
     def press_tab(self, times=1):
-        """按指定次数的 Tab 键"""
         for _ in range(times):
             ActionChains(self.driver).send_keys(Keys.TAB).perform()
             time.sleep(0.3)
 
     def fill_focused_input(self, text):
-        """在当前焦点输入框中填写文本"""
         active = self.driver.switch_to.active_element
         active.clear()
         active.send_keys(text)
-        print(f"✓ 输入: {text}")
 
     def click_focused(self):
-        """点击当前焦点元素"""
         active = self.driver.switch_to.active_element
         active.click()
-        print(f"✓ 点击: {active.tag_name}")
+
+    def open_and_start(self):
+        """打开问卷并点击'立即开始'按钮"""
+        print("正在打开问卷...")
+        self.driver.get(self.form_url)
+        
+        self.wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
+        time.sleep(3)
+        print("页面加载完成")
+        
+        try:
+            self.driver.find_element(By.ID, "DatePicker0-label")
+            print("✓ 已直接进入问卷")
+            return True
+        except:
+            pass
+        
+        print("正在定位'立即开始'按钮...")
+        
+        self.driver.find_element(By.TAG_NAME, "body").click()
+        time.sleep(0.5)
+        
+        for i in range(10):
+            ActionChains(self.driver).send_keys(Keys.TAB).perform()
+            time.sleep(0.3)
+            active = self.driver.switch_to.active_element
+            text = active.text.strip() if active.text else ""
+            print(f"  按了 {i+1} 次 Tab，当前: {active.tag_name}, text='{text[:30]}'")
+            
+            if text in ["立即开始", "Start now"] or (active.tag_name == "button" and "开始" in text):
+                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", active)
+                time.sleep(0.5)
+                self.driver.execute_script("arguments[0].click();", active)
+                print(f"✓ 已点击'{text}'按钮")
+                time.sleep(3)
+                
+                try:
+                    self.driver.find_element(By.ID, "DatePicker0-label")
+                    print("✓ 成功进入问卷")
+                    return True
+                except:
+                    print("⚠️ 点击后未进入问卷，继续尝试...")
+                    continue
+        
+        try:
+            start_btn = self.driver.find_element(By.XPATH, "//div[text()='立即开始']")
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", start_btn)
+            time.sleep(0.5)
+            self.driver.execute_script("arguments[0].click();", start_btn)
+            print("✓ 已点击'立即开始'按钮 (XPath)")
+            time.sleep(3)
+            return True
+        except:
+            pass
+        
+        print("❌ 无法进入问卷")
+        return False
 
     def fill_questions(self):
-        """按顺序填写所有题目（全部用 Tab 键定位）"""
         print("开始填写问卷...")
         time.sleep(2)
 
-        # ====== 按 2 次 Tab 到第1题 ======
-        self.press_tab(2)
-        today = datetime.now().strftime("%Y/%m/%d")
-        self.fill_focused_input(today)
+        # 第1题：日期（循环按 Tab 直到找到日期输入框）
+        for _ in range(10):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            tag = active.tag_name
+            input_type = active.get_attribute("type")
+            print(f"  当前焦点: tag={tag}, type={input_type}")
+            
+            if tag == "input" and input_type in ["text", "date", "tel", "email", "number", None]:
+                today = datetime.now().strftime("%Y/%m/%d")
+                active.clear()
+                active.send_keys(today)
+                print(f"✓ 第1题 (发现日期): {today}")
+                break
+        else:
+            print("✗ 第1题失败: 未找到日期输入框")
+            return
 
-        # ====== 按 1 次 Tab 到第2题 ======
-        self.press_tab(1)
-        self.select_focused_option("ABBS")
+        # 第2题：ABBS
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "ABBS" in active.text:
+                active.click()
+                print("✓ 第2题: ABBS")
+                break
+        else:
+            print("✗ 第2题失败: 未找到 ABBS")
 
-        # ====== 按 1 次 Tab 到第3题 ======
-        self.press_tab(1)
-        self.fill_focused_input("Yi Wang")
+        # 第3题：姓名
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            tag = active.tag_name
+            if tag == "input":
+                active.clear()
+                active.send_keys("Yi Wang")
+                print("✓ 第3题 (发现人): Yi Wang")
+                break
+        else:
+            print("✗ 第3题失败: 未找到姓名输入框")
 
-        # ====== 按 1 次 Tab 到第4题 ======
+        # 第4题：工位
         self.press_tab(1)
-        # 点击展开下拉菜单
         active = self.driver.switch_to.active_element
         active.click()
         time.sleep(0.5)
-        # 按 1 次 Tab 选择第一个选项
         self.press_tab(1)
-        # 按 Enter 确认
         ActionChains(self.driver).send_keys(Keys.ENTER).perform()
-        print("✓ 第4题 (发现工位): 选择工位")
+        print("✓ 第4题: 选择工位")
 
-        # ====== 按 1 次 Tab 到第5题 ======
-        self.press_tab(1)
-        self.select_focused_option("安全")
+        # 第5题：安全
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "安全" in active.text:
+                active.click()
+                print("✓ 第5题: 安全")
+                break
+        else:
+            print("✗ 第5题失败: 未找到'安全'选项")
 
-        # ====== 按 1 次 Tab 到第6题 ======
-        self.press_tab(1)
-        self.fill_focused_input("无问题")
+        # 第6题：问题描述
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            tag = active.tag_name
+            if tag == "input":
+                active.clear()
+                active.send_keys("无问题")
+                print("✓ 第6题 (问题描述): 无问题")
+                break
+        else:
+            print("✗ 第6题失败: 未找到问题描述输入框")
 
-        # ====== 按 1 次 Tab 到第7题 ======
-        self.press_tab(1)
-        self.select_focused_option("是")
+        # 第7题：是
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "是" in active.text:
+                active.click()
+                print("✓ 第7题: 是")
+                break
+        else:
+            print("✗ 第7题失败: 未找到'是'选项")
 
-        # ====== 按 1 次 Tab 到第8题 ======
-        self.press_tab(1)
-        self.select_focused_option("是")
+        # 第8题：是
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "是" in active.text:
+                active.click()
+                print("✓ 第8题: 是")
+                break
+        else:
+            print("✗ 第8题失败: 未找到'是'选项")
 
-        # ====== 按 2 次 Tab 到提交按钮 ======
+        # 提交
         self.press_tab(2)
-        self.click_focused()
-        print("✅ 问卷已自动提交！")
+        active = self.driver.switch_to.active_element
+        if active.tag_name == "button":
+            active.click()
+            print("✅ 问卷已自动提交！")
+        else:
+            print(f"⚠️ 当前焦点在 {active.tag_name}，尝试继续按 Tab...")
+            for _ in range(5):
+                self.press_tab(1)
+                active = self.driver.switch_to.active_element
+                if active.tag_name == "button":
+                    active.click()
+                    print("✅ 问卷已自动提交！")
+                    break
 
         print("\n" + "="*60)
         print("✅ 所有题目已填写完成！")
