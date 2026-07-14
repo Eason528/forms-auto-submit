@@ -31,14 +31,6 @@ class HydraulicsFormsFiller:
             ActionChains(self.driver).send_keys(Keys.TAB).perform()
             time.sleep(0.3)
 
-    def log_focus(self, step_name=""):
-        active = self.driver.switch_to.active_element
-        tag = active.tag_name
-        text = active.text.strip() if active.text else ""
-        input_type = active.get_attribute("type") if tag == "input" else ""
-        print(f"  [{step_name}] 焦点: tag={tag}, type={input_type}, text='{text[:30]}'")
-        return active
-
     def open_and_start(self):
         print("正在打开问卷...")
         self.driver.get(self.form_url)
@@ -96,121 +88,121 @@ class HydraulicsFormsFiller:
         return False
 
     def fill_questions(self):
-    print("开始填写问卷...")
-    time.sleep(2)
+        print("开始填写问卷...")
+        time.sleep(2)
 
-    # 第1题：日期
-    for _ in range(10):
+        # 第1题：日期
+        for _ in range(10):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.tag_name == "input" and active.get_attribute("type") in ["text", "date", None]:
+                today = datetime.now().strftime("%Y/%m/%d")
+                active.clear()
+                active.send_keys(today)
+                print(f"✓ 第1题 (发现日期): {today}")
+                break
+        else:
+            print("✗ 第1题失败")
+            return
+
+        # 第2题：ABBS（通过 value 属性匹配）
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            value = active.get_attribute("value") if active.tag_name == "input" else ""
+            text = active.text.strip() if active.text else ""
+            print(f"  [第2题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
+            
+            if value == "ABBS" or "ABBS" in text:
+                active.click()
+                print("✓ 第2题: ABBS")
+                break
+        else:
+            print("✗ 第2题失败: 未找到 ABBS")
+
+        # 第3题：发现人
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.tag_name == "input":
+                active.clear()
+                active.send_keys("Yi Wang")
+                print("✓ 第3题 (发现人): Yi Wang")
+                break
+        else:
+            print("✗ 第3题失败")
+
+        # 第4题：工位（下拉选择）
         self.press_tab(1)
         active = self.driver.switch_to.active_element
-        if active.tag_name == "input" and active.get_attribute("type") in ["text", "date", None]:
-            today = datetime.now().strftime("%Y/%m/%d")
-            active.clear()
-            active.send_keys(today)
-            print(f"✓ 第1题 (发现日期): {today}")
-            break
-    else:
-        print("✗ 第1题失败")
-        return
-
-    # 第2题：ABBS（通过 value 或 text 匹配）
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        value = active.get_attribute("value") if active.tag_name == "input" else ""
-        text = active.text.strip() if active.text else ""
-        print(f"  [第2题] 焦点: tag={active.tag_name}, value={value}, text='{text[:20]}'")
-        
-        if value == "ABBS" or "ABBS" in text:
-            active.click()
-            print("✓ 第2题: ABBS")
-            break
-    else:
-        print("✗ 第2题失败: 未找到 ABBS")
-
-    # 第3题：发现人
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        if active.tag_name == "input":
-            active.clear()
-            active.send_keys("Yi Wang")
-            print("✓ 第3题 (发现人): Yi Wang")
-            break
-    else:
-        print("✗ 第3题失败")
-
-    # 第4题：工位（下拉选择）
-    self.press_tab(1)
-    active = self.driver.switch_to.active_element
-    active.click()
-    time.sleep(0.5)
-    self.press_tab(1)
-    ActionChains(self.driver).send_keys(Keys.ENTER).perform()
-    print("✓ 第4题: 选择工位")
-
-    # 第5题：安全
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        if active.text and "安全" in active.text:
-            active.click()
-            print("✓ 第5题: 安全")
-            break
-    else:
-        print("✗ 第5题失败")
-
-    # 第6题：问题描述
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        if active.tag_name == "input":
-            active.clear()
-            active.send_keys("无问题")
-            print("✓ 第6题 (问题描述): 无问题")
-            break
-    else:
-        print("✗ 第6题失败")
-
-    # 第7题：是
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        if active.text and "是" in active.text:
-            active.click()
-            print("✓ 第7题: 是")
-            break
-    else:
-        print("✗ 第7题失败")
-
-    # 第8题：是
-    for _ in range(5):
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        if active.text and "是" in active.text:
-            active.click()
-            print("✓ 第8题: 是")
-            break
-    else:
-        print("✗ 第8题失败")
-
-    # 提交
-    self.press_tab(2)
-    active = self.driver.switch_to.active_element
-    if active.tag_name == "button" and ("提交" in active.text or "Submit" in active.text):
         active.click()
-        print("✅ 问卷已自动提交！")
-    else:
-        try:
-            submit_btn = self.driver.find_element(By.XPATH, "//button[@type='submit']")
-            submit_btn.click()
-            print("✅ 问卷已自动提交！")
-        except:
-            print("✗ 自动提交失败")
+        time.sleep(0.5)
+        self.press_tab(1)
+        ActionChains(self.driver).send_keys(Keys.ENTER).perform()
+        print("✓ 第4题: 选择工位")
 
-    print("\n" + "="*60)
-    print("✅ 所有题目已填写完成！")
-    print("="*60 + "\n")
+        # 第5题：安全
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "安全" in active.text:
+                active.click()
+                print("✓ 第5题: 安全")
+                break
+        else:
+            print("✗ 第5题失败")
+
+        # 第6题：问题描述
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.tag_name == "input":
+                active.clear()
+                active.send_keys("无问题")
+                print("✓ 第6题 (问题描述): 无问题")
+                break
+        else:
+            print("✗ 第6题失败")
+
+        # 第7题：是
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "是" in active.text:
+                active.click()
+                print("✓ 第7题: 是")
+                break
+        else:
+            print("✗ 第7题失败")
+
+        # 第8题：是
+        for _ in range(5):
+            self.press_tab(1)
+            active = self.driver.switch_to.active_element
+            if active.text and "是" in active.text:
+                active.click()
+                print("✓ 第8题: 是")
+                break
+        else:
+            print("✗ 第8题失败")
+
+        # 提交
+        self.press_tab(2)
+        active = self.driver.switch_to.active_element
+        if active.tag_name == "button" and ("提交" in active.text or "Submit" in active.text):
+            active.click()
+            print("✅ 问卷已自动提交！")
+        else:
+            try:
+                submit_btn = self.driver.find_element(By.XPATH, "//button[@type='submit']")
+                submit_btn.click()
+                print("✅ 问卷已自动提交！")
+            except:
+                print("✗ 自动提交失败")
+
+        print("\n" + "="*60)
+        print("✅ 所有题目已填写完成！")
+        print("="*60 + "\n")
 
     def close(self):
         time.sleep(3)
