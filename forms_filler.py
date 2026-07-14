@@ -14,6 +14,7 @@ class HydraulicsFormsFiller:
     def __init__(self, form_url):
         self.form_url = form_url
         firefox_options = Options()
+        # 无头模式（GitHub Actions 必需）
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
@@ -132,17 +133,25 @@ class HydraulicsFormsFiller:
         else:
             print("✗ 第3题失败")
 
-        # 第4题：工位
+        # 第4题：工位（通过 XPath 定位下拉选项）
         self.press_tab(1)
         active = self.driver.switch_to.active_element
         print(f"  [第4题-下拉] 焦点: tag={active.tag_name}, text='{active.text[:20] if active.text else ''}'")
         active.click()
         time.sleep(0.5)
-        self.press_tab(1)
-        active = self.driver.switch_to.active_element
-        print(f"  [第4题-选项] 焦点: tag={active.tag_name}, text='{active.text[:20] if active.text else ''}'")
-        ActionChains(self.driver).send_keys(Keys.ENTER).perform()
-        print("✓ 第4题: 选择工位")
+
+        # 等待下拉选项出现，点击第一个可见选项
+        try:
+            options = WebDriverWait(self.driver, 5).until(
+                EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'item') or contains(@role, 'option')]"))
+            )
+            if options:
+                options[0].click()
+                print("✓ 第4题: 选择工位")
+            else:
+                print("✗ 第4题: 没有找到下拉选项")
+        except Exception as e:
+            print(f"✗ 第4题: 选择失败 - {e}")
 
         # 第5题：安全
         for _ in range(5):
